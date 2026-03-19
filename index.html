@@ -3,143 +3,109 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>家族のタスク</title>
+    <title>家族の共有タスク</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
     
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
+
     <style>
-        :root {
-            --primary: #4A90E2;
-            --bg: #F0F2F5;
-            --white: #FFFFFF;
-            --danger: #FF3B30;
+        :root { --primary: #4A90E2; --bg: #F0F2F5; --white: #FFFFFF; --danger: #FF3B30; }
+        body { margin: 0; font-family: -apple-system, BlinkMacSystemFont, sans-serif; background-color: var(--bg); color: #333; }
+        #app { display: flex; flex-direction: column; height: 100vh; }
+        
+        header { 
+            background: var(--white); 
+            padding: env(safe-area-inset-top) 15px 10px; 
+            text-align: center; 
+            border-bottom: 1px solid #ddd; 
+            position: sticky; 
+            top: 0; 
+            z-index: 10; 
         }
 
-        body {
-            margin: 0;
-            font-family: -apple-system, sans-serif;
-            background-color: var(--bg);
-            -webkit-user-select: none; /* 誤操作防止 */
+        /* 曜日選択タブ */
+        .day-tabs { 
+            display: flex; 
+            overflow-x: auto; 
+            background: var(--white); 
+            padding: 10px 5px; 
+            gap: 8px; 
+            -webkit-overflow-scrolling: touch; 
         }
-
-        #app {
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+        .tab-btn { 
+            flex: 0 0 18%; 
+            border: none; 
+            background: #eee; 
+            padding: 12px 0; 
+            border-radius: 10px; 
+            font-weight: bold; 
+            font-size: 14px;
         }
+        .tab-btn.active { background: var(--primary); color: white; }
 
-        header {
-            background: var(--white);
-            padding: env(safe-area-inset-top) 15px 10px;
-            text-align: center;
-            border-bottom: 1px solid #ddd;
-            position: sticky;
-            top: 0;
-            z-index: 10;
+        main { flex: 1; padding: 15px; overflow-y: auto; }
+
+        /* 入力エリア */
+        .input-group { 
+            display: flex; 
+            flex-direction: column; 
+            gap: 8px; 
+            margin-bottom: 20px; 
+            background: var(--white); 
+            padding: 15px; 
+            border-radius: 15px; 
+            box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
         }
-
-        /* 曜日タブの改善：スクロール可能に */
-        .day-tabs {
-            display: flex;
-            overflow-x: auto;
-            background: var(--white);
-            padding: 10px 5px;
-            gap: 8px;
-            -webkit-overflow-scrolling: touch;
+        input[type="text"], select { 
+            padding: 12px; 
+            border: 1px solid #ddd; 
+            border-radius: 8px; 
+            font-size: 16px; 
+            -webkit-appearance: none;
         }
-
-        .tab-btn {
-            flex: 0 0 18%; /* iPhoneで4〜5個見えるサイズ */
-            border: none;
-            background: #eee;
-            padding: 12px 0;
-            border-radius: 10px;
-            font-weight: bold;
-            transition: 0.2s;
-        }
-
-        .tab-btn.active {
-            background: var(--primary);
-            color: white;
-        }
-
-        main {
-            flex: 1;
-            padding: 15px;
-            overflow-y: auto;
-        }
-
-        .input-group {
-            display: flex;
-            flex-direction: column;
-            gap: 8px;
-            margin-bottom: 20px;
-            background: var(--white);
-            padding: 15px;
-            border-radius: 15px;
-        }
-
-        input[type="text"], select {
-            padding: 12px;
-            border: 1px solid #ddd;
-            border-radius: 8px;
-            font-size: 16px; /* ズーム防止 */
-        }
-
-        #add-btn {
-            background: var(--primary);
-            color: white;
-            border: none;
-            padding: 12px;
-            border-radius: 8px;
-            font-weight: bold;
+        #add-btn { 
+            background: var(--primary); 
+            color: white; 
+            border: none; 
+            padding: 12px; 
+            border-radius: 8px; 
+            font-weight: bold; 
+            font-size: 16px;
         }
 
         /* タスクリスト表示 */
-        .task-item {
-            background: var(--white);
-            margin-bottom: 10px;
-            padding: 15px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            gap: 12px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        .task-item { 
+            background: var(--white); 
+            margin-bottom: 10px; 
+            padding: 15px; 
+            border-radius: 12px; 
+            display: flex; 
+            align-items: center; 
+            gap: 12px; 
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
         }
-
-        .task-text {
-            flex: 1;
-            font-size: 1rem;
-        }
-
-        .completed .task-text {
-            text-decoration: line-through;
-            color: #888;
-        }
-
-        .badge {
-            font-size: 0.75rem;
-            padding: 2px 8px;
-            border-radius: 4px;
-            background: #e9ecef;
-        }
-
-        .delete-btn {
-            color: var(--danger);
-            background: none;
-            border: none;
+        .task-text { flex: 1; font-size: 16px; line-height: 1.4; }
+        .completed .task-text { text-decoration: line-through; color: #888; }
+        .badge { 
+            display: inline-block;
+            font-size: 0.7rem; 
+            padding: 2px 6px; 
+            border-radius: 4px; 
+            background: #e9ecef; 
+            margin-bottom: 4px;
             font-weight: bold;
         }
+        .delete-btn { color: var(--danger); background: none; border: none; font-size: 14px; padding: 10px; }
     </style>
 </head>
 <body>
 
 <div id="app">
-    <header>
-        <h2 id="day-display">月曜日</h2>
-    </header>
-
+    <header><h2 id="day-display" style="margin:0; font-size: 18px;">月曜日</h2></header>
+    
     <nav class="day-tabs">
         <button class="tab-btn active" onclick="switchDay('mon', this)">月</button>
         <button class="tab-btn" onclick="switchDay('tue', this)">火</button>
@@ -152,7 +118,7 @@
 
     <main>
         <div class="input-group">
-            <input type="text" id="task-input" placeholder="なにする？">
+            <input type="text" id="task-input" placeholder="やること・メッセージを入力">
             <div style="display: flex; gap: 8px;">
                 <select id="user-select" style="flex: 1;">
                     <option>パパ</option>
@@ -163,82 +129,108 @@
                 <button id="add-btn" onclick="addTask()" style="flex: 1;">追加</button>
             </div>
         </div>
-        <div id="list-container"></div>
+        <div id="list-container">読み込み中...</div>
     </main>
 </div>
 
 <script>
+    /**
+     * 【重要】Firebaseの設定
+     * ここをご自身のスクリーンショットの内容に書き換えてください。
+     */
+    const firebaseConfig = {
+        apiKey: "AIzaSyC...", // ★ご自身の apiKey に書き換え
+        authDomain: "family-task-sync-f4268.firebaseapp.com",
+        projectId: "family-task-sync-f4268",
+        storageBucket: "family-task-sync-f4268.firebasestorage.app",
+        messagingSenderId: "889240789469",
+        appId: "1:889240789469:web:fbc9e1c5c03374..." // ★ご自身の appId に書き換え
+    };
+
+    // Firebaseの初期化
+    firebase.initializeApp(firebaseConfig);
+    const db = firebase.firestore();
+
     let currentDay = 'mon';
     const dayNames = { mon:'月曜日', tue:'火曜日', wed:'水曜日', thu:'木曜日', fri:'金曜日', sat:'土曜日', sun:'日曜日' };
-    
-    // データの読み込み
-    let data = JSON.parse(localStorage.getItem('familyApp')) || { mon:[], tue:[], wed:[], thu:[], fri:[], sat:[], sun:[] };
 
+    // データのリアルタイム監視
+    function listenTasks() {
+        const container = document.getElementById('list-container');
+        
+        db.collection("tasks")
+          .where("day", "==", currentDay)
+          .orderBy("createdAt", "asc")
+          .onSnapshot((snapshot) => {
+            container.innerHTML = '';
+            snapshot.forEach((doc) => {
+                const task = doc.data();
+                const div = document.createElement('div');
+                div.className = `task-item ${task.done ? 'completed' : ''}`;
+                div.innerHTML = `
+                    <input type="checkbox" ${task.done ? 'checked' : ''} 
+                        onchange="toggleTask('${doc.id}', ${task.done})" 
+                        style="width: 24px; height: 24px;">
+                    <div class="task-text">
+                        <span class="badge">${task.user}</span><br>
+                        ${task.text}
+                    </div>
+                    <button class="delete-btn" onclick="deleteTask('${doc.id}')">削除</button>
+                `;
+                container.appendChild(div);
+            });
+            if (snapshot.empty) {
+                container.innerHTML = '<p style="text-align:center; color:#999; margin-top:20px;">タスクはありません</p>';
+            }
+        }, (error) => {
+            console.error("エラー:", error);
+            container.innerHTML = '<p style="color:red; text-align:center;">権限エラーです。Firebaseのルール設定を確認してください。</p>';
+        });
+    }
+
+    // 曜日切り替え
     function switchDay(day, el) {
         currentDay = day;
         document.getElementById('day-display').innerText = dayNames[day];
         document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
         el.classList.add('active');
-        render();
+        listenTasks();
     }
 
-    function addTask() {
+    // タスク追加
+    async function addTask() {
         const input = document.getElementById('task-input');
         const user = document.getElementById('user-select').value;
-        if (!input.value) return;
+        if (!input.value.trim()) return;
 
-        const newTask = {
-            id: Date.now(),
-            text: input.value,
-            user: user,
-            done: false
-        };
-
-        data[currentDay].push(newTask);
-        save();
-        input.value = '';
-        render();
+        try {
+            await db.collection("tasks").add({
+                text: input.value,
+                user: user,
+                day: currentDay,
+                done: false,
+                createdAt: firebase.firestore.FieldValue.serverTimestamp()
+            });
+            input.value = '';
+        } catch (e) {
+            alert("エラーが発生しました。設定（Rules）を確認してください。");
+        }
     }
 
-    function toggleTask(id) {
-        const task = data[currentDay].find(t => t.id === id);
-        if (task) task.done = !task.done;
-        save();
-        render();
+    // 完了・未完了の切り替え
+    function toggleTask(id, currentStatus) {
+        db.collection("tasks").doc(id).update({ done: !currentStatus });
     }
 
+    // 削除
     function deleteTask(id) {
-        if (!confirm('削除しますか？')) return;
-        data[currentDay] = data[currentDay].filter(t => t.id !== id);
-        save();
-        render();
+        if (confirm('このタスクを削除してもよろしいですか？')) {
+            db.collection("tasks").doc(id).delete();
+        }
     }
 
-    function save() {
-        localStorage.setItem('familyApp', JSON.stringify(data));
-    }
-
-    function render() {
-        const container = document.getElementById('list-container');
-        container.innerHTML = '';
-        
-        data[currentDay].forEach(task => {
-            const div = document.createElement('div');
-            div.className = `task-item ${task.done ? 'completed' : ''}`;
-            div.innerHTML = `
-                <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask(${task.id})" style="transform: scale(1.5);">
-                <div class="task-text">
-                    <span class="badge">${task.user}</span><br>
-                    ${task.text}
-                </div>
-                <button class="delete-btn" onclick="deleteTask(${task.id})">削除</button>
-            `;
-            container.appendChild(div);
-        });
-    }
-
-    // 初回描画
-    render();
+    // 初期起動
+    listenTasks();
 </script>
 
 </body>
