@@ -3,8 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>家族別タスク共有システム</title>
+    <title>家族別タスク共有アプリ</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
     
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
@@ -12,65 +13,84 @@
 
     <style>
         :root { --primary: #4A90E2; --bg: #F0F2F5; --white: #FFFFFF; --danger: #FF3B30; }
-        body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(--bg); color: #333; }
-        header { background: var(--white); padding: env(safe-area-inset-top) 15px 10px; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10; }
+        body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(--bg); color: #333; -webkit-tap-highlight-color: transparent; }
+        #app { display: flex; flex-direction: column; height: 100vh; }
         
-        .family-controls { display: flex; gap: 8px; align-items: center; }
-        .family-selector { flex: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid var(--primary); font-weight: bold; background: #fff; }
-        .edit-btn { padding: 10px; background: #eee; border: none; border-radius: 8px; font-size: 12px; color: #666; }
+        header { 
+            background: var(--white); padding: env(safe-area-inset-top) 15px 10px; 
+            border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10;
+        }
 
-        .day-tabs { display: flex; overflow-x: auto; background: var(--white); padding: 10px 5px; gap: 8px; border-bottom: 1px solid #eee; }
+        .family-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 5px; }
+        .family-selector { 
+            flex: 1; padding: 12px; font-size: 16px; border-radius: 10px; 
+            border: 2px solid var(--primary); font-weight: bold; background: #fff; 
+        }
+        .edit-btn { padding: 10px 12px; background: #f0f0f0; border: 1px solid #ccc; border-radius: 8px; font-size: 12px; color: #555; font-weight: bold; }
+
+        .day-tabs { 
+            display: flex; overflow-x: auto; background: var(--white); padding: 10px 5px; gap: 8px; 
+            border-bottom: 1px solid #eee; -webkit-overflow-scrolling: touch;
+        }
         .tab-btn { flex: 0 0 18%; border: none; background: #eee; padding: 12px 0; border-radius: 10px; font-weight: bold; font-size: 14px; }
         .tab-btn.active { background: var(--primary); color: white; }
 
-        main { padding: 15px; }
-        .input-group { display: flex; flex-direction: column; gap: 8px; margin-bottom: 20px; background: var(--white); padding: 15px; border-radius: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); }
+        main { flex: 1; padding: 15px; overflow-y: auto; }
+        .input-group { 
+            display: flex; flex-direction: column; gap: 10px; margin-bottom: 20px; 
+            background: var(--white); padding: 15px; border-radius: 15px; box-shadow: 0 2px 8px rgba(0,0,0,0.05); 
+        }
         input[type="text"], select { padding: 14px; border: 1px solid #ddd; border-radius: 10px; font-size: 16px; }
-        #add-btn { background: var(--primary); color: white; border: none; padding: 14px; border-radius: 10px; font-weight: bold; }
+        #add-btn { background: var(--primary); color: white; border: none; padding: 15px; border-radius: 10px; font-weight: bold; font-size: 16px; }
 
-        .task-item { background: var(--white); margin-bottom: 10px; padding: 15px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
-        .task-text { flex: 1; font-size: 16px; }
+        .task-item { 
+            background: var(--white); margin-bottom: 10px; padding: 15px; border-radius: 12px; 
+            display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); 
+        }
+        .task-text { flex: 1; font-size: 16px; line-height: 1.4; }
         .completed .task-text { text-decoration: line-through; color: #bbb; }
-        .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: #e9ecef; font-weight: bold; }
-        .delete-btn { color: var(--danger); background: none; border: none; font-size: 14px; }
-        input[type="checkbox"] { width: 24px; height: 24px; }
+        .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: #e9ecef; font-weight: bold; color: #666; margin-bottom: 4px; display: inline-block; }
+        .delete-btn { color: var(--danger); background: none; border: none; font-size: 14px; padding: 10px; font-weight: bold; }
+        input[type="checkbox"] { width: 26px; height: 26px; accent-color: var(--primary); }
     </style>
 </head>
 <body>
 
-<header>
-    <div class="family-controls">
-        <select id="family-select" class="family-selector" onchange="switchFamily()">
-            </select>
-        <button class="edit-btn" onclick="editFamilyName()">名前<br>変更</button>
-    </div>
-</header>
-
-<nav class="day-tabs">
-    <button class="tab-btn active" onclick="switchDay('mon', this)">月</button>
-    <button class="tab-btn" onclick="switchDay('tue', this)">火</button>
-    <button class="tab-btn" onclick="switchDay('wed', this)">水</button>
-    <button class="tab-btn" onclick="switchDay('thu', this)">木</button>
-    <button class="tab-btn" onclick="switchDay('fri', this)">金</button>
-    <button class="tab-btn" onclick="switchDay('sat', this)">土</button>
-    <button class="tab-btn" onclick="switchDay('sun', this)">日</button>
-</nav>
-
-<main>
-    <div class="input-group">
-        <input type="text" id="task-input" placeholder="タスクを入力...">
-        <div style="display: flex; gap: 8px;">
-            <select id="user-select" style="flex: 1;">
-                <option>パパ</option><option>ママ</option><option>子供</option><option>全員</option>
-            </select>
-            <button id="add-btn" onclick="addTask()" style="flex: 1;">追加</button>
+<div id="app">
+    <header>
+        <div class="family-controls">
+            <select id="family-select" class="family-selector" onchange="switchFamily()">
+                </select>
+            <button class="edit-btn" onclick="editFamilyName()">名前変更</button>
         </div>
-    </div>
-    <div id="list-container">読み込み中...</div>
-</main>
+    </header>
+    
+    <nav class="day-tabs">
+        <button class="tab-btn active" onclick="switchDay('mon', this)">月</button>
+        <button class="tab-btn" onclick="switchDay('tue', this)">火</button>
+        <button class="tab-btn" onclick="switchDay('wed', this)">水</button>
+        <button class="tab-btn" onclick="switchDay('thu', this)">木</button>
+        <button class="tab-btn" onclick="switchDay('fri', this)">金</button>
+        <button class="tab-btn" onclick="switchDay('sat', this)">土</button>
+        <button class="tab-btn" onclick="switchDay('sun', this)">日</button>
+    </nav>
+
+    <main>
+        <div class="input-group">
+            <input type="text" id="task-input" placeholder="やること・買うものを入力...">
+            <div style="display: flex; gap: 8px;">
+                <select id="user-select" style="flex: 1;">
+                    <option>パパ</option><option>ママ</option><option>子供</option><option>全員</option>
+                </select>
+                <button id="add-btn" onclick="addTask()" style="flex: 1;">追加</button>
+            </div>
+        </div>
+        <div id="list-container">読み込み中...</div>
+    </main>
+</div>
 
 <script>
-    // ★Firebase Config（ご自身のものを貼り付けてください）
+    // ★重要：ご自身のFirebase Configに書き換えてください★
     const firebaseConfig = {
         apiKey: "AIzaSyCmQWA0tGob5fPgCaDDUGZktlk...", 
         authDomain: "family-task-sync-f4268.firebaseapp.com",
@@ -86,7 +106,7 @@
     let currentDay = 'mon';
     let currentFamily = localStorage.getItem('lastFamily') || 'family1';
 
-    // 家族の名前リスト（ブラウザに保存）
+    // 家族名の読み込み（スマホ本体に保存されているもの、なければ初期値）
     let familyNames = JSON.parse(localStorage.getItem('familyNames')) || {
         family1: "1家族目", family2: "2家族目", family3: "3家族目", family4: "4家族目", family5: "5家族目",
         family6: "6家族目", family7: "7家族目", family8: "8家族目", family9: "9家族目", family10: "10家族目"
@@ -105,7 +125,7 @@
     }
 
     function editFamilyName() {
-        const newName = prompt(`表示名を変更しますか？`, familyNames[currentFamily]);
+        const newName = prompt(`「${familyNames[currentFamily]}」の表示名を入力してください：`, familyNames[currentFamily]);
         if (newName && newName.trim() !== "") {
             familyNames[currentFamily] = newName;
             localStorage.setItem('familyNames', JSON.stringify(familyNames));
@@ -115,33 +135,37 @@
 
     function listenTasks() {
         const container = document.getElementById('list-container');
-        // 【重要】familyId と day の両方が一致するデータだけをリアルタイム取得
+        // 並び替え(orderBy)を使うとインデックスエラーが出やすいため、まずはシンプルに取得
         db.collection("tasks")
           .where("familyId", "==", currentFamily)
           .where("day", "==", currentDay)
           .onSnapshot((snapshot) => {
             container.innerHTML = '';
-            snapshot.forEach((doc) => {
-                const task = doc.data();
+            let tasks = [];
+            snapshot.forEach(doc => tasks.push({id: doc.id, ...doc.data()}));
+            
+            // JavaScript側で時間順に並び替え（サーバー負荷とエラーを回避）
+            tasks.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+
+            tasks.forEach((task) => {
                 const div = document.createElement('div');
                 div.className = `task-item ${task.done ? 'completed' : ''}`;
                 div.innerHTML = `
-                    <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask('${doc.id}', ${task.done})">
+                    <input type="checkbox" ${task.done ? 'checked' : ''} onchange="toggleTask('${task.id}', ${task.done})">
                     <div class="task-text"><span class="badge">${task.user}</span><br>${task.text}</div>
-                    <button class="delete-btn" onclick="deleteTask('${doc.id}')">削除</button>
+                    <button class="delete-btn" onclick="deleteTask('${task.id}')">削除</button>
                 `;
                 container.appendChild(div);
             });
-            if (container.innerHTML === '') container.innerHTML = '<p style="text-align:center;color:#999;margin-top:20px;">タスクはありません</p>';
+            if (tasks.length === 0) container.innerHTML = '<p style="text-align:center;color:#999;margin-top:20px;">タスクはありません</p>';
         }, (error) => {
-            console.error(error);
-            container.innerHTML = `<p style="color:red;text-align:center;">エラーが発生しました。設定を確認してください。</p>`;
+            container.innerHTML = `<p style="color:red;text-align:center;">エラー: ${error.message}</p>`;
         });
     }
 
     function switchFamily() {
         currentFamily = document.getElementById('family-select').value;
-        localStorage.setItem('lastFamily', currentFamily); // 最後に選んだ家族を保存
+        localStorage.setItem('lastFamily', currentFamily);
         listenTasks();
     }
 
@@ -157,7 +181,6 @@
         const user = document.getElementById('user-select').value;
         if (!input.value.trim()) return;
 
-        // 【重要】現在の familyId を含めて保存
         await db.collection("tasks").add({
             familyId: currentFamily,
             text: input.value,
@@ -170,8 +193,9 @@
     }
 
     function toggleTask(id, currentStatus) { db.collection("tasks").doc(id).update({ done: !currentStatus }); }
-    function deleteTask(id) { if (confirm('このタスクを削除しますか？')) db.collection("tasks").doc(id).delete(); }
+    function deleteTask(id) { if (confirm('削除しますか？')) db.collection("tasks").doc(id).delete(); }
 
+    // 初期化
     updateFamilyDropdown();
     listenTasks();
 </script>
