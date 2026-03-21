@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-    <title>家族タスク管理・名前編集版</title>
+    <title>家族別タスク共有システム</title>
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/906/906334.png">
     
@@ -11,14 +11,13 @@
     <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-firestore-compat.js"></script>
 
     <style>
-        :root { --primary: #4A90E2; --bg: #F0F2F5; --white: #FFFFFF; --danger: #FF3B30; --success: #34C759; }
-        body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(--bg); color: #333; padding-bottom: 20px; }
+        :root { --primary: #4A90E2; --bg: #F0F2F5; --white: #FFFFFF; --danger: #FF3B30; }
+        body { margin: 0; font-family: -apple-system, sans-serif; background-color: var(--bg); color: #333; }
         header { background: var(--white); padding: env(safe-area-inset-top) 15px 10px; border-bottom: 1px solid #ddd; position: sticky; top: 0; z-index: 10; }
         
-        /* 家族選択と編集エリア */
-        .family-controls { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; }
+        .family-controls { display: flex; gap: 8px; align-items: center; }
         .family-selector { flex: 1; padding: 12px; font-size: 16px; border-radius: 8px; border: 2px solid var(--primary); font-weight: bold; background: #fff; }
-        .edit-btn { padding: 10px 15px; background: #666; color: white; border: none; border-radius: 8px; font-size: 14px; font-weight: bold; }
+        .edit-btn { padding: 10px; background: #eee; border: none; border-radius: 8px; font-size: 12px; color: #666; }
 
         .day-tabs { display: flex; overflow-x: auto; background: var(--white); padding: 10px 5px; gap: 8px; border-bottom: 1px solid #eee; }
         .tab-btn { flex: 0 0 18%; border: none; background: #eee; padding: 12px 0; border-radius: 10px; font-weight: bold; font-size: 14px; }
@@ -31,6 +30,7 @@
 
         .task-item { background: var(--white); margin-bottom: 10px; padding: 15px; border-radius: 12px; display: flex; align-items: center; gap: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1); }
         .task-text { flex: 1; font-size: 16px; }
+        .completed .task-text { text-decoration: line-through; color: #bbb; }
         .badge { font-size: 0.7rem; padding: 2px 8px; border-radius: 4px; background: #e9ecef; font-weight: bold; }
         .delete-btn { color: var(--danger); background: none; border: none; font-size: 14px; }
         input[type="checkbox"] { width: 24px; height: 24px; }
@@ -42,7 +42,7 @@
     <div class="family-controls">
         <select id="family-select" class="family-selector" onchange="switchFamily()">
             </select>
-        <button class="edit-btn" onclick="editFamilyName()">名前変更</button>
+        <button class="edit-btn" onclick="editFamilyName()">名前<br>変更</button>
     </div>
 </header>
 
@@ -70,28 +70,28 @@
 </main>
 
 <script>
+    // ★Firebase Config（ご自身のものを貼り付けてください）
     const firebaseConfig = {
-        apiKey: "YOUR_API_KEY", 
-        authDomain: "YOUR_PROJECT.firebaseapp.com",
-        projectId: "YOUR_PROJECT",
-        storageBucket: "YOUR_PROJECT.firebasestorage.app",
-        messagingSenderId: "YOUR_SENDER_ID",
-        appId: "YOUR_APP_ID"
+        apiKey: "AIzaSyCmQWA0tGob5fPgCaDDUGZktlk...", 
+        authDomain: "family-task-sync-f4268.firebaseapp.com",
+        projectId: "family-task-sync-f4268",
+        storageBucket: "family-task-sync-f4268.firebasestorage.app",
+        messagingSenderId: "889240789469",
+        appId: "1:889240789469:web:fbc9e1c5c03374..." 
     };
 
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
 
     let currentDay = 'mon';
-    let currentFamily = 'family1';
+    let currentFamily = localStorage.getItem('lastFamily') || 'family1';
 
-    // 家族の名前リストを管理（初期値）
+    // 家族の名前リスト（ブラウザに保存）
     let familyNames = JSON.parse(localStorage.getItem('familyNames')) || {
         family1: "1家族目", family2: "2家族目", family3: "3家族目", family4: "4家族目", family5: "5家族目",
         family6: "6家族目", family7: "7家族目", family8: "8家族目", family9: "9家族目", family10: "10家族目"
     };
 
-    // セレクトボックスを更新
     function updateFamilyDropdown() {
         const select = document.getElementById('family-select');
         select.innerHTML = '';
@@ -104,18 +104,18 @@
         }
     }
 
-    // 名前を編集する
     function editFamilyName() {
-        const newName = prompt(`「${familyNames[currentFamily]}」の新しい名前を入力してください:`, familyNames[currentFamily]);
+        const newName = prompt(`表示名を変更しますか？`, familyNames[currentFamily]);
         if (newName && newName.trim() !== "") {
             familyNames[currentFamily] = newName;
-            localStorage.setItem('familyNames', JSON.stringify(familyNames)); // 保存
+            localStorage.setItem('familyNames', JSON.stringify(familyNames));
             updateFamilyDropdown();
         }
     }
 
     function listenTasks() {
         const container = document.getElementById('list-container');
+        // 【重要】familyId と day の両方が一致するデータだけをリアルタイム取得
         db.collection("tasks")
           .where("familyId", "==", currentFamily)
           .where("day", "==", currentDay)
@@ -132,12 +132,16 @@
                 `;
                 container.appendChild(div);
             });
-            if (container.innerHTML === '') container.innerHTML = '<p style="text-align:center;color:#999;">タスクはありません</p>';
+            if (container.innerHTML === '') container.innerHTML = '<p style="text-align:center;color:#999;margin-top:20px;">タスクはありません</p>';
+        }, (error) => {
+            console.error(error);
+            container.innerHTML = `<p style="color:red;text-align:center;">エラーが発生しました。設定を確認してください。</p>`;
         });
     }
 
     function switchFamily() {
         currentFamily = document.getElementById('family-select').value;
+        localStorage.setItem('lastFamily', currentFamily); // 最後に選んだ家族を保存
         listenTasks();
     }
 
@@ -152,6 +156,8 @@
         const input = document.getElementById('task-input');
         const user = document.getElementById('user-select').value;
         if (!input.value.trim()) return;
+
+        // 【重要】現在の familyId を含めて保存
         await db.collection("tasks").add({
             familyId: currentFamily,
             text: input.value,
@@ -164,9 +170,8 @@
     }
 
     function toggleTask(id, currentStatus) { db.collection("tasks").doc(id).update({ done: !currentStatus }); }
-    function deleteTask(id) { if (confirm('削除しますか？')) db.collection("tasks").doc(id).delete(); }
+    function deleteTask(id) { if (confirm('このタスクを削除しますか？')) db.collection("tasks").doc(id).delete(); }
 
-    // 初期起動
     updateFamilyDropdown();
     listenTasks();
 </script>
